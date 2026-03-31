@@ -64,7 +64,6 @@ nav:
     - Ports Reference: configuration/ports.md
     - application.yml Reference: configuration/application-yml.md
     - Storage Modes: configuration/storage.md
-    - Persistence: configuration/persistence.md
   - Services:
     - Overview: services/index.md
     - SSM Parameter Store: services/ssm.md
