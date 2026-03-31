@@ -1,0 +1,56 @@
+# Dockerfile.seed — Build a Floci image with pre-baked AWS resources.
+#
+# Usage:
+#   1. Place shell scripts in a local directory (e.g. ./seed/).
+#      Each script should use the AWS CLI to create resources:
+#        #!/bin/bash
+#        aws s3 mb s3://my-bucket
+#        aws sqs create-queue --queue-name my-queue
+#
+#   2. Build the seeded image:
+#        docker build -f Dockerfile.seed \
+#          --build-arg BASE_IMAGE=hectorvent/floci:latest-awscli \
+#          -t my-floci-seeded .
+#
+#   3. Run it — resources are already there, no init overhead:
+#        docker run -p 4566:4566 my-floci-seeded
+#
+# The seed scripts run once at build time. The resulting persistent state
+# is baked into the image so every container starts with those resources
+# already available.
+
+ARG BASE_IMAGE=hectorvent/floci:latest-awscli
+
+# ---------- Stage 1: seed ----------
+FROM ${BASE_IMAGE} AS seed
+
+ENV FLOCI_STORAGE_MODE=persistent
+ENV FLOCI_STORAGE_PERSISTENT_PATH=/app/data
+ENV AWS_ENDPOINT_URL=http://localhost:4566
+ENV AWS_DEFAULT_REGION=us-east-1
+ENV AWS_ACCESS_KEY_ID=test
+ENV AWS_SECRET_ACCESS_KEY=test
+
+COPY seed/ /etc/floci/seed/
+
+# Start Floci, wait for it to become healthy, run every seed script,
+# then shut down so the persistent data is flushed to /app/data.
+RUN java -jar quarkus-app/quarkus-run.jar & \
+    FLOCI_PID=$! && \
+    echo "Waiting for Floci to become healthy..." && \
+    timeout 60 bash -c \
+      'until curl -sf http://localhost:4566/_floci/health > /dev/null 2>&1; do sleep 0.5; done' && \
+    echo "Floci is healthy — running seed scripts" && \
+    for f in /etc/floci/seed/*.sh; do \
+      [ -f "$f" ] && echo "  → $f" && bash "$f"; \
+    done && \
+    echo "Seed complete — shutting down Floci" && \
+    kill "$FLOCI_PID" && wait "$FLOCI_PID" 2>/dev/null || true
+
+# ---------- Stage 2: final image ----------
+FROM ${BASE_IMAGE}
+
+ENV FLOCI_STORAGE_MODE=persistent
+ENV FLOCI_STORAGE_PERSISTENT_PATH=/app/data
+
+COPY --from=seed /app/data/ /app/data/
