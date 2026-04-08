@@ -1611,7 +1611,10 @@ public class S3Controller {
         }
 
         // Validate policy conditions if present
-        String policy = fields.get("policy");
+        String policy = fields.get("Policy");
+        if (policy == null) {
+            policy = fields.get("policy");
+        }
         if (policy != null && !policy.isEmpty()) {
             validatePolicyConditions(policy, bucket, fields, fileData.length);
         }
