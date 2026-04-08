@@ -16,6 +16,9 @@ public class S3VirtualHostFilter implements ContainerRequestFilter {
 
     private final String baseHostname;
 
+    // Cannot use @Inject with EmulatorConfig here: @PreMatching JAX-RS filters are
+    // instantiated before CDI beans are fully initialized, causing SRCFG00027 at startup.
+    // Use programmatic ConfigProvider lookup instead.
     public S3VirtualHostFilter() {
         String baseUrl = ConfigProvider.getConfig()
                 .getOptionalValue("floci.base-url", String.class)
