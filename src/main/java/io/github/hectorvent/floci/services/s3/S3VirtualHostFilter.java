@@ -1,14 +1,14 @@
 package io.github.hectorvent.floci.services.s3;
 
-import io.github.hectorvent.floci.config.EmulatorConfig;
-import jakarta.inject.Inject;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
 import jakarta.ws.rs.container.PreMatching;
 import jakarta.ws.rs.core.UriBuilder;
 import jakarta.ws.rs.ext.Provider;
+import org.eclipse.microprofile.config.ConfigProvider;
 
 import java.net.URI;
+import java.util.Optional;
 
 @Provider
 @PreMatching
@@ -16,9 +16,16 @@ public class S3VirtualHostFilter implements ContainerRequestFilter {
 
     private final String baseHostname;
 
-    @Inject
-    public S3VirtualHostFilter(EmulatorConfig config) {
-        this.baseHostname = extractHostnameFromUrl(config.effectiveBaseUrl());
+    public S3VirtualHostFilter() {
+        String baseUrl = ConfigProvider.getConfig()
+                .getOptionalValue("floci.base-url", String.class)
+                .orElse("http://localhost:4566");
+        Optional<String> hostname = ConfigProvider.getConfig()
+                .getOptionalValue("floci.hostname", String.class);
+        String effectiveUrl = hostname
+                .map(h -> baseUrl.replaceFirst("://[^:/]+(:\\d+)?", "://" + h + "$1"))
+                .orElse(baseUrl);
+        this.baseHostname = extractHostnameFromUrl(effectiveUrl);
     }
 
     @Override
