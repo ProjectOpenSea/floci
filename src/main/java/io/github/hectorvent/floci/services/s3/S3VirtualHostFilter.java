@@ -1,15 +1,14 @@
 package io.github.hectorvent.floci.services.s3;
 
+import io.github.hectorvent.floci.config.EmulatorConfig;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
 import jakarta.ws.rs.container.PreMatching;
 import jakarta.ws.rs.core.UriBuilder;
 import jakarta.ws.rs.ext.Provider;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.net.URI;
-import java.util.Optional;
 
 @Provider
 @PreMatching
@@ -18,13 +17,8 @@ public class S3VirtualHostFilter implements ContainerRequestFilter {
     private final String baseHostname;
 
     @Inject
-    public S3VirtualHostFilter(
-            @ConfigProperty(name = "floci.base-url", defaultValue = "http://localhost:4566") String baseUrl,
-            @ConfigProperty(name = "floci.hostname") Optional<String> hostname) {
-        String effectiveUrl = hostname
-                .map(h -> baseUrl.replaceFirst("://[^:/]+(:\\d+)?", "://" + h + "$1"))
-                .orElse(baseUrl);
-        this.baseHostname = extractHostnameFromUrl(effectiveUrl);
+    public S3VirtualHostFilter(EmulatorConfig config) {
+        this.baseHostname = extractHostnameFromUrl(config.effectiveBaseUrl());
     }
 
     @Override
@@ -71,19 +65,21 @@ public class S3VirtualHostFilter implements ContainerRequestFilter {
      * matches a well-known AWS S3 domain pattern (for DNS-redirect setups).
      *
      * Examples with baseHostname="localhost":
-     *   my-bucket.localhost:4566       → "my-bucket"
-     *   my-bucket.localhost            → "my-bucket"
-     *   floci.svc.cluster.local        → null  (no bucket prefix, path-style)
-     *   my-svc.floci.svc.cluster.local → null  (remainder doesn't match "localhost")
+     *   my-bucket.localhost:4566       -> "my-bucket"
+     *   my-bucket.localhost            -> "my-bucket"
+     *   floci.svc.cluster.local        -> null  (no bucket prefix, path-style)
+     *   my-svc.floci.svc.cluster.local -> null  (remainder doesn't match "localhost")
      *
      * Examples with baseHostname="floci.svc.cluster.local":
-     *   my-bucket.floci.svc.cluster.local → "my-bucket"
-     *   floci.svc.cluster.local           → null  (no bucket prefix, path-style)
+     *   my-bucket.floci.svc.cluster.local -> "my-bucket"
+     *   floci.svc.cluster.local           -> null  (no bucket prefix, path-style)
      *
      * Returns null if the host does not match a virtual-hosted pattern.
      */
     static String extractBucket(String host, String baseHostname) {
-        if (host == null) return null;
+        if (host == null) {
+            return null;
+        }
 
         // Strip port if present
         String hostname = stripPort(host);
@@ -117,7 +113,9 @@ public class S3VirtualHostFilter implements ContainerRequestFilter {
 
     /** Extracts the hostname (without scheme or port) from a URL string. */
     static String extractHostnameFromUrl(String url) {
-        if (url == null) return null;
+        if (url == null) {
+            return null;
+        }
         try {
             URI uri = URI.create(url);
             return uri.getHost();
@@ -147,11 +145,15 @@ public class S3VirtualHostFilter implements ContainerRequestFilter {
         return true;
     }
 
-    /** Returns true for *.s3.amazonaws.com and *.s3.<region>.amazonaws.com domains. */
+    /** Returns true for *.s3.amazonaws.com and *.s3.region.amazonaws.com domains. */
     private static boolean isAwsS3Domain(String remainder) {
-        if ("s3.amazonaws.com".equals(remainder)) return true;
+        if ("s3.amazonaws.com".equals(remainder)) {
+            return true;
+        }
         // s3.<region>.amazonaws.com
-        if (remainder.startsWith("s3.") && remainder.endsWith(".amazonaws.com")) return true;
+        if (remainder.startsWith("s3.") && remainder.endsWith(".amazonaws.com")) {
+            return true;
+        }
         return false;
     }
 }
