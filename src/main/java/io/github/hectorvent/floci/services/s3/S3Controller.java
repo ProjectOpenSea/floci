@@ -391,10 +391,12 @@ public class S3Controller {
             byte[] data = decodeAwsChunked(body, contentEncoding, contentSha256);
             validateChecksumHeaders(httpHeaders, data);
             String persistedEncoding = toPersistedContentEncoding(contentEncoding);
+            String cacheControl = httpHeaders.getHeaderString("Cache-Control");
             S3Object obj = s3Service.putObject(bucket, key, data, contentType, extractUserMetadata(httpHeaders),
                     httpHeaders.getHeaderString("x-amz-storage-class"),
                     persistedEncoding,
-                    lockMode, retainUntil, legalHold);
+                    lockMode, retainUntil, legalHold,
+                    cacheControl);
             var resp = Response.ok().header("ETag", obj.getETag());
             if (obj.getVersionId() != null) {
                 resp.header("x-amz-version-id", obj.getVersionId());
@@ -1266,6 +1268,9 @@ public class S3Controller {
         if (obj.getContentEncoding() != null) {
             resp.header("Content-Encoding", obj.getContentEncoding());
         }
+        if (obj.getCacheControl() != null) {
+            resp.header("Cache-Control", obj.getCacheControl());
+        }
         if (obj.getMetadata() != null) {
             for (Map.Entry<String, String> entry : obj.getMetadata().entrySet()) {
                 resp.header("x-amz-meta-" + entry.getKey(), entry.getValue());
@@ -1310,12 +1315,14 @@ public class S3Controller {
         String sourceKey = decodedSource.substring(slashIndex + 1);
 
         String copyContentEncoding = toPersistedContentEncoding(httpHeaders.getHeaderString("Content-Encoding"));
+        String copyCacheControl = httpHeaders.getHeaderString("Cache-Control");
         S3Object copy = s3Service.copyObject(sourceBucket, sourceKey, destBucket, destKey,
                 httpHeaders.getHeaderString("x-amz-metadata-directive"),
                 extractUserMetadata(httpHeaders),
                 httpHeaders.getHeaderString("x-amz-storage-class"),
                 contentType,
-                copyContentEncoding);
+                copyContentEncoding,
+                copyCacheControl);
         String xml = new XmlBuilder()
                 .raw("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
                 .start("CopyObjectResult", AwsNamespaces.S3)
