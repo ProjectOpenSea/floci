@@ -406,12 +406,16 @@ class S3PresignedPostIntegrationTest {
                 .contentType("application/xml")
                 .extract().body().asString();
 
-        // Verify the raw XML contains the expected structure with XML-escaped quotes.
-        // This is the exact substring that the seadn test suite asserts against.
-        assertThat(responseBody, containsString(
-                "<Code>AccessDenied</Code>"
-                        + "<Message>Invalid according to Policy: Policy Condition failed: "
-                        + "[&quot;eq&quot;, &quot;$Content-Type&quot;, &quot;image/png&quot;]</Message>"));
+        // Assert the exact XML structure, matching what AWS S3 and LocalStack return.
+        // The RequestId is a random UUID, so we match it with a regex.
+        assertThat(responseBody, matchesRegex(
+                "\\Q<?xml version=\"1.0\" encoding=\"UTF-8\"?>\\E"
+                        + "\\Q<Error>\\E"
+                        + "\\Q<Code>AccessDenied</Code>\\E"
+                        + "\\Q<Message>Invalid according to Policy: Policy Condition failed: \\E"
+                        + "\\Q[&quot;eq&quot;, &quot;$Content-Type&quot;, &quot;image/png&quot;]</Message>\\E"
+                        + "<RequestId>[0-9a-f\\-]+</RequestId>"
+                        + "\\Q</Error>\\E"));
     }
 
     @Test
