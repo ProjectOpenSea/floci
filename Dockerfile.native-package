@@ -7,7 +7,9 @@ ENV FLOCI_VERSION=${VERSION}
 
 WORKDIR /app
 
-RUN mkdir -p /app/data \
+RUN microdnf install -y wget \
+    && microdnf clean all \
+    && mkdir -p /app/data \
     && chown -R 1001:root /app \
     && chmod -R g+rwX /app
 
