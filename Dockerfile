@@ -19,12 +19,10 @@ COPY --from=build /build/target/quarkus-app/ quarkus-app/
 RUN mkdir -p /app/data
 VOLUME /app/data
 
-RUN apk add --no-cache curl
-
 EXPOSE 4566 6379-6399
 
 HEALTHCHECK --interval=5s --timeout=3s --retries=5 \
-    CMD curl -f http://localhost:4566/_floci/health || exit 1
+    CMD wget -q --spider http://localhost:4566/_floci/health || exit 1
 
 ARG VERSION=latest
 ENV FLOCI_VERSION=${VERSION}

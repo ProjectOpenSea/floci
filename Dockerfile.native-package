@@ -7,9 +7,7 @@ ENV FLOCI_VERSION=${VERSION}
 
 WORKDIR /app
 
-RUN microdnf install -y curl \
-    && microdnf clean all \
-    && mkdir -p /app/data \
+RUN mkdir -p /app/data \
     && chown -R 1001:root /app \
     && chmod -R g+rwX /app
 
@@ -21,7 +19,7 @@ COPY --chown=1001:root target/*-runner /app/application
 EXPOSE 4566
 
 HEALTHCHECK --interval=5s --timeout=3s --retries=5 \
-    CMD curl -f http://localhost:4566/_floci/health || exit 1
+    CMD wget -q --spider http://localhost:4566/_floci/health || exit 1
 
 USER 1001
 

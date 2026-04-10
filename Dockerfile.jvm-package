@@ -11,7 +11,6 @@ RUN mkdir -p /app/data \
     && chown 1001:root /app \
     && chmod "g+rwX" /app \
     && chown 1001:root /app/data \
-    && apk add --no-cache curl \
     && if [ "$INSTALL_AWS_CLI" = "true" ]; then \
              apk add --no-cache aws-cli; \
        fi
@@ -23,7 +22,7 @@ COPY --chown=1001:root target/quarkus-app quarkus-app/
 EXPOSE 4566 6379-6399
 
 HEALTHCHECK --interval=5s --timeout=3s --retries=5 \
-    CMD curl -f http://localhost:4566/_floci/health || exit 1
+    CMD wget -q --spider http://localhost:4566/_floci/health || exit 1
 
 USER 1001
 
