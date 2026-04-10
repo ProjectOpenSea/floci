@@ -13,6 +13,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
 @QuarkusTest
@@ -374,6 +375,43 @@ class S3PresignedPostIntegrationTest {
             .body(hasXPath("/Error/Message", equalTo(
                     "Invalid according to Policy: Policy Condition failed: "
                             + "[\"starts-with\", \"$key\", \"uploads/\"]")));
+    }
+
+    @Test
+    @Order(94)
+    void presignedPostReturnsXmlErrorResponseBody() {
+        // Verify the raw XML wire format matches what AWS S3 and LocalStack return.
+        // This ensures clients that parse the raw response body (e.g. seadn) see the
+        // expected XML structure with &quot;-encoded quotes, not JSON.
+        String key = "uploads/xml-error-check.png";
+        String fileContent = "not a real png";
+
+        String policy = buildPolicy(BUCKET, key, "image/png", 0, 10485760);
+        String policyBase64 = Base64.getEncoder().encodeToString(policy.getBytes(StandardCharsets.UTF_8));
+
+        String responseBody =
+            given()
+                .multiPart("key", key)
+                .multiPart("Content-Type", "image/gif")
+                .multiPart("policy", policyBase64)
+                .multiPart("x-amz-algorithm", "AWS4-HMAC-SHA256")
+                .multiPart("x-amz-credential", "AKIAIOSFODNN7EXAMPLE/20260330/us-east-1/s3/aws4_request")
+                .multiPart("x-amz-date", AMZ_DATE_FORMAT.format(Instant.now()))
+                .multiPart("x-amz-signature", "dummysignature")
+                .multiPart("file", "xml-error-check.png", fileContent.getBytes(StandardCharsets.UTF_8), "image/gif")
+            .when()
+                .post("/" + BUCKET)
+            .then()
+                .statusCode(403)
+                .contentType("application/xml")
+                .extract().body().asString();
+
+        // Verify the raw XML contains the expected structure with XML-escaped quotes.
+        // This is the exact substring that the seadn test suite asserts against.
+        assertThat(responseBody, containsString(
+                "<Code>AccessDenied</Code>"
+                        + "<Message>Invalid according to Policy: Policy Condition failed: "
+                        + "[&quot;eq&quot;, &quot;$Content-Type&quot;, &quot;image/png&quot;]</Message>"));
     }
 
     @Test
